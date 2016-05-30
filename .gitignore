@@ -1,5 +1,11 @@
 *.py[cod]
 
+# ignore image
+images
+
+# ignore IDE autu-generated files
+.idea
+
 # C extensions
 *.so
 

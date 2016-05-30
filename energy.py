@@ -72,13 +72,13 @@ def entropy(pixel, square):
       histogram[b + (256/num_bins)*i] = 1
    #histogram = {b:1, 2*b:1, 3*b:1, 4*b:1, 5*b:1, 6*b:1, 7*b:1, 8*b:1, 9*b:1, 10*b:1}
    for x in range (hist_len):
-       for k, v in histogram.iteritems():
+       for k, v in histogram.items():
           if (square[x].gray < k):                
              histogram[k] += 1
              break
 
    #print histogram
-   square_prob = [float(v)/hist_len for k, v in histogram.iteritems()]
+   square_prob = [float(v)/hist_len for k, v in histogram.items()]
 
    #Shannon entropy formula with a base 2 log. Source:
    #http://upload.wikimedia.org/math/8/7/e/87efdf0d38947240683250d3a24466e0.png

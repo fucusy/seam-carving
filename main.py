@@ -1,5 +1,6 @@
 import image
 
+from skimage.io import imread
 
 #The following strings may be used for the energy argument:
 #'sobel', 'scharr', 'kroon', 'sobel5', 'scharr5'
@@ -59,9 +60,18 @@ import image
 #shrinking dolphin by 60 pixels
 #some of his fin is cut off because it is similar in color to the sky
 
-# im = image.sc_Image.from_filepath("images/dolphin.jpg")
-# im.shrink(60,orientation = 'vertical', energy = 'sobel5', alg = 'dyn')
-# im.to_jpeg("images/dolphin_shrank.jpg")
+
+im_array = imread("images/dolphin.jpg")
+
+im = image.sc_Image.from_img(im_array)
+
+
+im.shrink_to((50,50))
+
+
+im.to_jpeg("images/dolphin_shrank_sobel5_from_im_array_50_50.jpg")
+
+
 
 #shrinking birds by 120 pixels
 

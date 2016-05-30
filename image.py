@@ -3,12 +3,16 @@ from seams import seam_dijk, seam_dyn
 from random import randrange
 
 import copy
-import Image
+from PIL import Image
+from skimage.io import imsave
+import os
+from os import remove
 
 # Grayscales the image so that we can run energy calculations on it
 def to_grayscale (img):
 
     return img.convert("L")
+
 
 # creates image sc object from python image library representation of a picture
 def from_pil (im):
@@ -17,8 +21,8 @@ def from_pil (im):
     pixels = {}
     width, height = im.size
     data = im.getdata()
-    for w in range (width):
-        for h in range (height):
+    for w in range(width):
+        for h in range(height):
 
             color = data[ h * width + w]
             #we are working with a color image for the normal picture and have an rgb tuple
@@ -40,7 +44,8 @@ class sc_Image:
         self.pixels = pixels
         self.dim = 3
         self.PIL = PIL
-    
+
+
     # @classmethod
     # def from_filepath(cls, filepath):
     #     """ Given an image file turns into an sc_Image class.
@@ -60,14 +65,34 @@ class sc_Image:
 
     #Given an image file turns into an sc_Image class.
     #Replaced the im.getpixels calls with an im.getdata for performance reasons
-    @classmethod
-    def from_filepath (cls, filepath):
 
-        print 'converting to object'
-        im = Image.open (filepath)
+
+
+    @classmethod
+    def from_img(cls, img):
+        count = 0
+        filepath = "/tmp/seam_carving-%d.jpg" % count
+        while os.path.exists(filepath):
+            count += 1
+            filepath = "/tmp/seam_carving-%d.jpg" % count
+
+        imsave(filepath, img)
+        print('converting to object')
+        im = Image.open(filepath)
+        remove(filepath)
+        pixels, width, height = from_pil(im)
+        print('calculating energies')
+        return cls ((width, height), pixels, im)
+
+
+    @classmethod
+    def from_filepath(cls, filepath):
+
+        print('converting to object')
+        im = Image.open(filepath)
         pixels, width, height = from_pil(im)
 
-        print 'calculating energies'
+        print('calculating energies')
         return cls ((width, height), pixels, im)
 
 
@@ -95,10 +120,16 @@ class sc_Image:
             counter += 1
             self.set_energies (energy)
             seam = self.remove_seam_vert2 (alg)
-            print "Removed %d seams" % (counter)
+            print(("Removed %d seams" % (counter)))
         if orientation == 'horizontal' :
             self.transpose() 
 
+    def shrink_to(self, shape, energy = 'sobel', alg = 'dyn'):
+        width_remove = self.width - shape[0]
+        height_remove = self.height - shape[1]
+
+        self.shrink(width_remove, orientation="horizontal", energy=energy, alg=alg)
+        self.shrink(height_remove, orientation="vertical", energy=energy, alg=alg)
 
     #calculate the lowest energy seams then add duplicates of them to the picture
     def enlarge (self,  new_pixels, orientation = 'vertical', energy = 'e1', alg = 'dyn', inverse=False):
@@ -113,7 +144,7 @@ class sc_Image:
         original_height = self.height
         seams = self.get_n_seams(new_pixels, energy, alg, inverse)
 
-        print "Enlarging image..."
+        print("Enlarging image...")
 
         self.width = original_width
         self.height = original_height
@@ -212,7 +243,7 @@ class sc_Image:
 
         to_color = []
         for seam in seams:
-            to_color.append(map (lambda p : p.original_pos , filter(None,seam )))
+            to_color.append([p.original_pos for p in [_f for _f in seam if _f]])
         
 
         for seam in to_color:
@@ -236,8 +267,10 @@ class sc_Image:
 
         x, y = pos
         data = []
-        for j in range(y+(self.dim/2), y-(self.dim/2+1), -1):
-            for i in range(x-(self.dim/2),x+(self.dim/2+1)):
+        dim_div_2 = int(self.dim / 2)
+
+        for j in range(y+(dim_div_2), y-(dim_div_2+1), -1):
+            for i in range(x-(dim_div_2),x+(dim_div_2+1)):
                 try:
                     data.append(pixels[(i,j)])
                 except KeyError:
@@ -283,17 +316,17 @@ class sc_Image:
     # makes a pixel dictionary of the mirror reflection of the image and retunrs it
     def make_mirror_dic (self) :
 
-        marg = self.dim/2
+        marg = int(self.dim/2)
         temp_pix = self.pixels
 
-        for h in range(-marg, 0) + range(self.height, self.height + marg): 
+        for h in list(range(-marg, 0)) + list(range(self.height, self.height + marg)): 
             for w in range(self.width):
                 if h < 0 :
                     temp_pix[(w,h)] = Pixel( (w,h), (w,h), self.pixels[(w, 0)].gray )
                 else :
                     temp_pix[(w,h)] = Pixel( (w,h), (w,h), self.pixels[(w, self.height -1)].gray )
 
-        for w in range(-marg, 0) + range(self.width, self.width + marg): 
+        for w in list(range(-marg, 0)) + list(range(self.width, self.width + marg)): 
             for h in range(- marg, self.height + marg):
                 if w < 0:
                     if h < 0:
@@ -357,13 +390,13 @@ class sc_Image:
         #print 'p127-0 is None ', ( self.pixels[(127,0)] is None)
         self.dim = 3
         if algorithm == 'sobel':
-            map (set_energy_e1_Sobel ,self.pixels.values() )
+            list(map (set_energy_e1_Sobel ,list(self.pixels.values()) ))
 
         elif algorithm == 'scharr':
-            map (set_energy_e1_Scharr ,self.pixels.values() )
+            list(map (set_energy_e1_Scharr ,list(self.pixels.values()) ))
 
         elif algorithm == 'kroon':
-            map (set_energy_e1_Kroon ,self.pixels.values() ) 
+            list(map (set_energy_e1_Kroon ,list(self.pixels.values()) )) 
 
         elif (algorithm == 'sobel5' or algorithm == 'scharr5'):
             self.dim = 5
@@ -404,13 +437,13 @@ class sc_Image:
     # gets the leftmost verical row in ordered list
     def top_vert_row (self) :
 
-        return map (self.get_pixel, [(0,h) for h in range(self.height)] )
+        return list(map (self.get_pixel, [(0,h) for h in range(self.height)] ))
 
 
     # gets the top horizonal row of pixles in ordered list
     def top_horz_row (self) :
 
-        return map (self.get_pixel, [(w,0) for w in range(self.width)] )
+        return list(map (self.get_pixel, [(w,0) for w in range(self.width)] ))
 
 
     # removes vertical seams from the image after discovery
@@ -426,7 +459,7 @@ class sc_Image:
 
         #try making new ones instead of deep copy
         if return_pixels:
-            pixels = map( lambda p : copy.deepcopy (self.get_pixel(p)), seam)
+            pixels = [copy.deepcopy (self.get_pixel(p)) for p in seam]
         else:
             pixels = []
 
@@ -456,14 +489,14 @@ class sc_Image:
         for h in range(self.height): 
             for w in range (self.width): 
                 if self.pixels[(w,h)].pos != (w,h) :
-                    print 'mismatch at ', w, h, "-- ",self.pixels[(w,h)].pos
+                    print(('mismatch at ', w, h, "-- ",self.pixels[(w,h)].pos))
 
     #debugging function that checks self.pixels for None types
     def check_for_none(self):
         for h in range(self.height): 
             for w in range (self.width):
                 if self.pixels[(w,h)] is None:
-                    print "(%s, %s) is None" % (w,h)
+                    print("(%s, %s) is None" % (w,h))
 
     # copies back in a remembered seam for enlargement
     def insert_seam(self,pixels, seam):
@@ -513,7 +546,7 @@ class sc_Image:
             seam = self.remove_seam_vert2(alg, return_pixels = True)
             seams.append( seam )
 
-            print "Got %d seams" % (i+1)
+            print("Got %d seams" % (i+1))
         
         return seams
 
